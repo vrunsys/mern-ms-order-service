@@ -6,14 +6,20 @@
 	"scripts": {
 		"format:all": "biome format --write .",
 		"lint:all": "biome lint --fix .",
-		"check:all": "biome check --fix ."
+		"check:all": "biome check --fix .",
+		"prepare": "husky"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.0",
 		"@types/bun": "latest",
-		"husky": "^9.1.7"
+		"husky": "^9.1.7",
+		"lint-staged": "^17.0.7"
 	},
 	"peerDependencies": {
 		"typescript": "^5"
+	},
+
+	"lint-staged": {                             
+		"*.{js,jsx,ts,tsx}": ["biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"]
 	}
 }
