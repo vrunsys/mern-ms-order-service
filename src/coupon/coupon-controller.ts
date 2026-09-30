@@ -3,7 +3,12 @@ import { matchedData, validationResult } from "express-validator";
 import createHttpError from "http-errors";
 import type { CouponService } from "./coupon-service";
 import { resolveTenantScope } from "./coupon-service";
-import type { AuthedRequest, CouponInput, CouponUpdate } from "./coupon-types";
+import type {
+	ApplyCouponInput,
+	AuthedRequest,
+	CouponInput,
+	CouponUpdate,
+} from "./coupon-types";
 
 const requireAuth = (req: AuthedRequest) => {
 	const auth = req.auth;
@@ -20,6 +25,26 @@ const requireAuth = (req: AuthedRequest) => {
 
 export class CouponController {
 	constructor(private readonly couponService: CouponService) {}
+
+	/**
+	 * POST /coupons/apply
+	 *
+	 * Public, because a customer applying a code at checkout has no staff
+	 * token. The code is only ever looked up inside the tenant being ordered
+	 * from, so a code from one restaurant cannot be used at another.
+	 */
+	async apply(req: AuthedRequest, res: Response, next: NextFunction) {
+		const result = validationResult(req);
+		if (!result.isEmpty()) {
+			next(result.array());
+			return;
+		}
+
+		const input = matchedData(req) as ApplyCouponInput;
+		const applied = await this.couponService.applyCoupon(input);
+
+		res.status(200).json(applied);
+	}
 
 	async list(req: AuthedRequest, res: Response, next: NextFunction) {
 		const result = validationResult(req);

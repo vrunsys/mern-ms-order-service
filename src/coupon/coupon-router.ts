@@ -7,6 +7,7 @@ import { CouponController } from "./coupon-controller";
 import type { CouponService } from "./coupon-service";
 import couponServiceInstance from "./coupon-service";
 import {
+	applyCouponValidator,
 	couponIdValidator,
 	createCouponValidator,
 	listCouponsValidator,
@@ -17,6 +18,14 @@ export const createCouponRouter = (service: CouponService) => {
 	const router = Router();
 	const controller = new CouponController(service);
 	const staff = [authenticate, canAccess([Role.ADMIN, Role.MANAGER])];
+
+	// Public: a customer applying a code at checkout has no staff token.
+	// Declared before the staff routes so it can never be shadowed.
+	router.post(
+		"/apply",
+		applyCouponValidator,
+		asyncWrapper(controller.apply.bind(controller)),
+	);
 
 	router.get(
 		"/",

@@ -77,6 +77,27 @@ export const updateCouponValidator = [
 		.toInt(),
 ];
 
+export const applyCouponValidator = [
+	body("code")
+		.isString()
+		.trim()
+		.notEmpty()
+		.withMessage("code is required")
+		.matches(/^[A-Za-z0-9_-]+$/)
+		.withMessage("code may only contain letters, numbers, _ and -")
+		.isLength({ min: 3, max: 32 })
+		.withMessage("code must be between 3 and 32 characters")
+		.customSanitizer((value: string) => value.toUpperCase()),
+	body("tenantId")
+		.isInt({ min: 1 })
+		.withMessage("tenantId must be a positive integer")
+		.toInt(),
+	body("subtotal")
+		.isFloat({ gt: 0 })
+		.withMessage("subtotal must be greater than 0")
+		.toFloat(),
+];
+
 export const listCouponsValidator = [
 	query("tenantId")
 		.optional()

@@ -21,3 +21,17 @@ export interface CouponResponse extends CouponInput {
 	createdAt?: Date;
 	updatedAt?: Date;
 }
+
+export interface ApplyCouponInput {
+	code: string;
+	tenantId: number;
+	subtotal: number;
+}
+
+export interface AppliedCoupon {
+	code: string;
+	title: string;
+	discount: number;
+	discountAmount: number;
+	discountedSubtotal: number;
+}

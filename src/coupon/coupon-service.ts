@@ -2,7 +2,13 @@ import createHttpError from "http-errors";
 import logger from "../config/logger";
 import { Role } from "../constants";
 import Coupon from "./coupon-model";
-import type { CouponInput, CouponResponse, CouponUpdate } from "./coupon-types";
+import type {
+	AppliedCoupon,
+	ApplyCouponInput,
+	CouponInput,
+	CouponResponse,
+	CouponUpdate,
+} from "./coupon-types";
 
 type AuthContext = { role?: string; tenantId?: number | null };
 
@@ -62,6 +68,22 @@ const isDuplicateCodeError = (err: unknown): boolean =>
 	err !== null &&
 	(err as { code?: number }).code === 11000;
 
+const roundMoney = (value: number): number => Math.round(value * 100) / 100;
+
+export const calculateDiscount = (
+	subtotal: number,
+	discountPercent: number,
+): { discountAmount: number; discountedSubtotal: number } => {
+	// a coupon can never take the subtotal below zero
+	const capped = Math.min(Math.max(discountPercent, 0), 100);
+	const discountAmount = roundMoney((subtotal * capped) / 100);
+
+	return {
+		discountAmount,
+		discountedSubtotal: roundMoney(subtotal - discountAmount),
+	};
+};
+
 export class CouponService {
 	async list(tenantId: number): Promise<CouponResponse[]> {
 		const coupons = await Coupon.find({ tenantId })
@@ -69,6 +91,51 @@ export class CouponService {
 			.lean();
 
 		return coupons.map((coupon) => toResponse(coupon));
+	}
+
+	/**
+	 * Validates a code for one tenant and works out the discount.
+	 *
+	 * This is the only coupon endpoint reachable without a staff token, so it
+	 * deliberately exposes nothing beyond what the customer already knows: the
+	 * code they typed and their own subtotal.
+	 */
+	async applyCoupon({
+		code,
+		tenantId,
+		subtotal,
+	}: ApplyCouponInput): Promise<AppliedCoupon> {
+		const coupon = await Coupon.findOne({
+			code: code.toUpperCase(),
+			tenantId,
+		}).lean();
+
+		if (!coupon) {
+			throw createHttpError(404, "That coupon code is not valid");
+		}
+
+		if (new Date(coupon.validUpto).getTime() < Date.now()) {
+			throw createHttpError(400, "That coupon has expired");
+		}
+
+		const { discountAmount, discountedSubtotal } = calculateDiscount(
+			subtotal,
+			coupon.discount,
+		);
+
+		logger.info("Coupon applied", {
+			code: coupon.code,
+			tenantId,
+			discountAmount,
+		});
+
+		return {
+			code: coupon.code,
+			title: coupon.title,
+			discount: coupon.discount,
+			discountAmount,
+			discountedSubtotal,
+		};
 	}
 
 	async create(input: CouponInput): Promise<CouponResponse> {

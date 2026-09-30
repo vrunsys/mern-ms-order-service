@@ -6,13 +6,18 @@ import request from "supertest";
 import { Role } from "../src/constants";
 import { CouponController } from "../src/coupon/coupon-controller";
 import type { CouponService } from "../src/coupon/coupon-service";
-import { resolveTenantScope } from "../src/coupon/coupon-service";
+import {
+	calculateDiscount,
+	resolveTenantScope,
+} from "../src/coupon/coupon-service";
 import type {
+	ApplyCouponInput,
 	CouponInput,
 	CouponResponse,
 	CouponUpdate,
 } from "../src/coupon/coupon-types";
 import {
+	applyCouponValidator,
 	createCouponValidator,
 	listCouponsValidator,
 	updateCouponValidator,
@@ -51,6 +56,11 @@ const buildApp = (service: Partial<CouponService>, auth: Auth | null) => {
 
 	const controller = new CouponController(service as CouponService);
 
+	app.post(
+		"/apply",
+		applyCouponValidator,
+		asyncWrapper(controller.apply.bind(controller)),
+	);
 	app.get(
 		"/",
 		listCouponsValidator,
@@ -185,6 +195,98 @@ describe("POST /coupons", () => {
 
 		expect(res.status).toBe(401);
 		expect(create).not.toHaveBeenCalled();
+	});
+});
+
+describe("calculateDiscount", () => {
+	it("takes a percentage off the subtotal", () => {
+		expect(calculateDiscount(1000, 10)).toEqual({
+			discountAmount: 100,
+			discountedSubtotal: 900,
+		});
+	});
+
+	it("rounds to two decimals", () => {
+		expect(calculateDiscount(333, 15)).toEqual({
+			discountAmount: 49.95,
+			discountedSubtotal: 283.05,
+		});
+	});
+
+	it("never produces a negative subtotal on a 100% coupon", () => {
+		expect(calculateDiscount(250, 100)).toEqual({
+			discountAmount: 250,
+			discountedSubtotal: 0,
+		});
+	});
+
+	it("clamps a percentage above 100 rather than going negative", () => {
+		expect(calculateDiscount(200, 150)).toEqual({
+			discountAmount: 200,
+			discountedSubtotal: 0,
+		});
+	});
+});
+
+describe("POST /coupons/apply", () => {
+	const applyCoupon = () =>
+		mock(async (_input: ApplyCouponInput) => ({
+			code: "ENJOY_10",
+			title: "Ten percent off",
+			discount: 10,
+			discountAmount: 100,
+			discountedSubtotal: 900,
+		}));
+
+	it("works without any auth context", async () => {
+		const service = applyCoupon();
+		const res = await request(buildApp({ applyCoupon: service }, null))
+			.post("/apply")
+			.send({ code: "ENJOY_10", tenantId: 7, subtotal: 1000 });
+
+		expect(res.status).toBe(200);
+		expect(res.body.discountedSubtotal).toBe(900);
+		expect(service.mock.calls[0]?.[0].tenantId).toBe(7);
+	});
+
+	it("uppercases the code before sending it", async () => {
+		const service = applyCoupon();
+		await request(buildApp({ applyCoupon: service }, null))
+			.post("/apply")
+			.send({ code: "enjoy_10", tenantId: 7, subtotal: 1000 });
+
+		expect(service.mock.calls[0]?.[0].code).toBe("ENJOY_10");
+	});
+
+	it("rejects a missing subtotal", async () => {
+		const service = applyCoupon();
+		const res = await request(buildApp({ applyCoupon: service }, null))
+			.post("/apply")
+			.send({ code: "ENJOY_10", tenantId: 7 });
+
+		expect(res.status).toBe(400);
+		expect(service).not.toHaveBeenCalled();
+	});
+
+	it("rejects a subtotal of zero", async () => {
+		const service = applyCoupon();
+		const res = await request(buildApp({ applyCoupon: service }, null))
+			.post("/apply")
+			.send({ code: "ENJOY_10", tenantId: 7, subtotal: 0 });
+
+		expect(res.status).toBe(400);
+	});
+
+	it("surfaces a 404 for a code that is not valid", async () => {
+		const service = mock(async (_input: ApplyCouponInput) => {
+			throw createHttpError(404, "That coupon code is not valid");
+		});
+		const res = await request(buildApp({ applyCoupon: service }, null))
+			.post("/apply")
+			.send({ code: "NOPE", tenantId: 7, subtotal: 1000 });
+
+		expect(res.status).toBe(404);
+		expect(res.body.errors[0].msg).toBe("That coupon code is not valid");
 	});
 });
 
