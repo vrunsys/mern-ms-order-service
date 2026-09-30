@@ -13,6 +13,8 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.5.0",
 		"@types/bun": "latest",
+		"@types/cookie-parser": "^1.4.10",
+		"@types/cors": "^2.8.19",
 		"@types/express": "^5.0.6",
 		"@types/http-errors": "^2.0.5",
 		"@types/supertest": "^7.2.0",
@@ -28,8 +30,15 @@
 		]
 	},
 	"dependencies": {
+		"config": "^5.0.1",
+		"cookie-parser": "^1.4.7",
+		"cors": "^2.8.6",
 		"express": "^5.2.1",
+		"express-jwt": "^8.5.1",
+		"express-validator": "^7.3.2",
 		"http-errors": "^2.0.1",
+		"jwks-rsa": "^4.1.0",
+		"mongoose": "^9.10.0",
 		"supertest": "^7.2.2",
 		"uuid": "^14.0.2",
 		"winston": "^3.19.0"

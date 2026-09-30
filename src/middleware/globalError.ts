@@ -10,17 +10,47 @@ interface ValidationErrorItem {
 	location: string;
 }
 
+interface ResolvedHttpError {
+	status: number;
+	name: string;
+	message: string;
+	stack?: string;
+}
+
+const resolveHttpError = (err: unknown): ResolvedHttpError | null => {
+	if (isHttpError(err)) {
+		return {
+			status: err.status,
+			name: err.name,
+			message: err.message,
+			stack: err.stack,
+		};
+	}
+
+	if (err instanceof Error) {
+		const { status } = err as Error & { status?: unknown };
+		if (typeof status === "number" && status >= 400 && status <= 599) {
+			return {
+				status,
+				name: err.name || "Error",
+				message: err.message,
+				stack: err.stack,
+			};
+		}
+	}
+
+	return null;
+};
+
 export const globalError = (
 	err: unknown,
 	req: Request,
 	res: Response,
-	// _next is required to preserve the 4-arg Express error handler signature
 	_next: NextFunction,
 ) => {
 	const errorId = uuidv4();
 	const isProduction = process.env.NODE_ENV === "production";
 
-	// Validation errors array from express-validator
 	if (Array.isArray(err)) {
 		const validationErrors = err as ValidationErrorItem[];
 		logger.warn("Validation failed", {
@@ -43,31 +73,30 @@ export const globalError = (
 		});
 	}
 
-	// Http errors (createHttpError)
-	if (isHttpError(err)) {
-		logger.error(err.message, {
+	const httpError = resolveHttpError(err);
+	if (httpError) {
+		logger.error(httpError.message, {
 			id: errorId,
-			error: err.stack,
+			error: httpError.stack,
 			path: req.path,
 			method: req.method,
 		});
 
-		return res.status(err.status).json({
+		return res.status(httpError.status).json({
 			errors: [
 				{
 					ref: errorId,
-					type: err.name,
-					msg: isProduction ? "Internal Server Error" : err.message,
+					type: httpError.name,
+					msg: isProduction ? "Internal Server Error" : httpError.message,
 					path: req.path,
 					method: req.method,
 					location: "server",
-					stack: isProduction ? null : err.stack,
+					stack: isProduction ? null : (httpError.stack ?? null),
 				},
 			],
 		});
 	}
 
-	// Unknown/unexpected errors
 	const error = err as Error;
 	logger.error(error.message ?? "Unknown error", {
 		id: errorId,

@@ -17,7 +17,6 @@ const buildApp = () => {
 		}),
 	);
 
-	// Rejects with a typed HTTP error -> status and message must survive
 	app.get(
 		"/http-error",
 		asyncWrapper(async () => {
@@ -26,7 +25,6 @@ const buildApp = () => {
 		}),
 	);
 
-	// Rejects with a non-HTTP error -> must be masked as a 500
 	app.get(
 		"/unknown-error",
 		asyncWrapper(async () => {
@@ -35,7 +33,6 @@ const buildApp = () => {
 		}),
 	);
 
-	// Synchronous throw inside an async handler
 	app.get(
 		"/sync-throw",
 		asyncWrapper(async () => {
@@ -43,7 +40,6 @@ const buildApp = () => {
 		}),
 	);
 
-	// next(err) with an express-validator style array -> 400
 	app.get(
 		"/validation",
 		asyncWrapper(async (_req, _res, next) => {
@@ -81,7 +77,6 @@ describe("asyncWrapper", () => {
 		const res = await request(buildApp()).get("/unknown-error");
 		expect(res.status).toBe(500);
 		expect(res.body.errors[0].msg).toBe("Internal Server Error");
-		// the raw error message must never reach the client
 		expect(JSON.stringify(res.body)).not.toContain("hunter2");
 	});
 

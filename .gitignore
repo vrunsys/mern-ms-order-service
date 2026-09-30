@@ -22,6 +22,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.production.local
 .env.local
 
+# node-config: the whole config/ directory is ignored because it holds
+# credentials (database URIs). Copy config.example.json to config/default.json
+# to get started.
+/config
+
 # caches
 .eslintcache
 .cache

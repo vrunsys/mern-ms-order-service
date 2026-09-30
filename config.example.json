@@ -1,0 +1,14 @@
+{
+	"service": {
+		"port": 5503,
+		"dbUrl": "mongodb+srv://<user>:<password>@<cluster>/?appName=mern-o-service"
+	},
+	"auth": {
+		"jwksUri": "http://localhost:3000/.well-known/jwks.json"
+	},
+	"origins": [
+		"http://localhost:5173",
+		"http://localhost:3000",
+		"http://localhost:3001"
+	]
+}
